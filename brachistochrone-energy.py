@@ -95,7 +95,7 @@ def init_beads(nbeads):
         bead.graph = vpython.gcurve(color=COLORS[i], width=2)
         # Track the initial position for energy purposes. Also need to give
         # each bead a tiny kick to get going, since we don't track velocity.
-        bead.y0 = bead.pos.y + 1e-3
+        bead.y0 = bead.pos.y + 1e-5
         beads.append(bead)
     return beads
 
