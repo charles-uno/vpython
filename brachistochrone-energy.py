@@ -21,33 +21,33 @@ COLORS = (
 )
 
 
-# Keep track of time globally so we don't have to pass it around everywhere
-t = 0
-dt = 0.005
-tmax = 3
-
-
 def main():
     draw_wire()
     init_graph()
     beads = init_beads(6)
-    # Keep looping until the advance_beads function returns False
-
-    sample_counter = 0
-
-    while advance_beads(beads):
-
-        dt_sample = 0.05
-        sample_rate = dt_sample/dt
-
-        if sample_counter % sample_rate == 0:
-            sample_id = sample_counter/sample_rate
-            stamp = "%03.0f" % (1000*t)
-            print(f"saving: brac-{stamp}.png")
-            vpython.scene.capture(f"brac-{stamp}.png")
-        sample_counter += 1
-
+    t, dt, tmax = 0, 0.05, 2
+    while t < tmax:
+        t += dt
+        vpython.rate(1/dt)
+        all_done = True
+        for bead in beads:
+            # Once this bead gets to the bottom, stop updating it. Once all the
+            # beads get to the bottom, we're all done.
+            if advance_bead(bead, dt):
+                all_done = False
+            bead.graph.plot(t, bead.pos.y + WHEEL_RADIUS)
+        if all_done:
+            break
     return
+
+
+def advance_bead(bead, dt):
+    # Short-circuit this bead's motion as soon as it gets to the bottom
+    if bead.pos.x > 0:
+        return False
+    bead.v = wire_v(bead.pos.y, bead.y0)
+    bead.pos += bead.v*dt
+    return True
 
 
 def draw_wire():
@@ -69,9 +69,6 @@ def draw_wire():
     return
 
 
-GRAPHS = []
-
-
 def init_graph():
     vpython.graph(
         title="Beads on a Cycloid Wire",
@@ -79,10 +76,6 @@ def init_graph():
         ytitle="Height (m)",
         fast=False,
     )
-    for i, color in enumerate(COLORS):
-        GRAPHS.append(
-            vpython.gcurve(color=COLORS[i], width=2)
-        )
     return
 
 
@@ -95,31 +88,22 @@ def init_beads(nbeads):
             radius=0.1,
             color=COLORS[i],
         )
-        # Keep track of initial height. Give it a little kick to get started,
-        # since we track only position (not velocity or momentum)
+        # Use the bead object to keep track of all the dead's data, not just
+        # the visual stuff.
+        bead.graph = vpython.gcurve(color=COLORS[i], width=2)
+        # Track the initial position for energy purposes. Also need to give
+        # each bead a tiny kick to get going, since we don't track velocity.
         bead.y0 = bead.pos.y + 1e-3
         beads.append(bead)
     return beads
 
 
-def advance_beads(beads):
-    global t
-    t += dt
-    vpython.rate(1/dt)
-    all_done = True
-    for i, bead in enumerate(beads):
-        v = wire_v(bead.pos.y, bead.y0)
-        if v.y == 0:
-            continue
-        if t < tmax:
-            all_done = False
-        bead.pos += v*dt
-        GRAPHS[i].plot(t, bead.pos.y + WHEEL_RADIUS)
-    return not all_done
-
-
 # Some helper functions for keeping track of the shape of the wire. Note
 # there's an offset above y=0 because the camera is centered at the origin
+
+
+def wire_v(y, y0=0):
+    return math.sqrt(-2*GRAVITY*(y - y0))*wire_direction(wire_theta(y))
 
 
 def wire_x(theta):
@@ -131,9 +115,10 @@ def wire_y(theta):
 
 
 def wire_theta(y):
+    # Note: since we're getting theta from y, this will only work for descent
     try:
         return math.acos(y/WHEEL_RADIUS)
-    # Possible that we'll dip slightly below the wire numerically
+    # Numerical jitters may dip us a bit below zero
     except ValueError:
         return math.pi
 
@@ -143,10 +128,6 @@ def wire_direction(theta):
     dy = wire_y(theta + small) - wire_y(theta - small)
     dx = wire_x(theta + small) - wire_x(theta - small)
     return vpython.vector(dx, dy, 0)/math.sqrt(dx*dx + dy*dy)
-
-
-def wire_v(y, y0=0):
-    return math.sqrt(-2*GRAVITY*(y - y0))*wire_direction(wire_theta(y))
 
 
 if __name__ == "__main__":

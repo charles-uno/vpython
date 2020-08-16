@@ -25,7 +25,7 @@ def main():
     draw_wire()
     init_graph()
     beads = init_beads(6)
-    t, dt, tmax = 0, 0.01, 2
+    t, dt, tmax = 0, 0.05, 2
     while t < tmax:
         t += dt
         vpython.rate(1/dt)
@@ -49,7 +49,7 @@ def advance_bead(bead, dt):
     # direction of the wire. Don't bother computing the force of constraint.
     dvdt = vpython.vector(0, -GRAVITY, 0)
     v = bead.v + dvdt*dt
-    w_hat = wire_direction(wire_theta(bead.pos))
+    w_hat = wire_direction(wire_theta(bead.pos.y))
     bead.v = w_hat*v.dot(w_hat)
     bead.pos += bead.v*dt
     return True
@@ -113,10 +113,10 @@ def wire_y(theta):
     return WHEEL_RADIUS*math.cos(theta)
 
 
-def wire_theta(pos):
+def wire_theta(y):
     # Note: since we're getting theta from y, this will only work for descent
     try:
-        return math.acos(pos.y/WHEEL_RADIUS)
+        return math.acos(y/WHEEL_RADIUS)
     # Numerical jitters may dip us a bit below zero
     except ValueError:
         return math.pi
