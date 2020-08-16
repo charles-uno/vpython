@@ -8,7 +8,7 @@ import vpython
 
 DEG = math.pi/180
 
-WHEEL_RADIUS = 1
+WHEEL_RADIUS = 100
 GRAVITY = 9.81
 
 COLORS = (
@@ -25,16 +25,18 @@ def main():
     draw_wire()
     init_graph()
     beads = init_beads(6)
-    t, dt, tmax = 0, 0.05, 2
+    t, dt, tmax = 0, 0.1, 20
     while t < tmax:
         t += dt
         vpython.rate(1/dt)
         all_done = True
-        for bead in beads:
+        for i, bead in enumerate(beads):
             # Once this bead gets to the bottom, stop updating it. Once all the
             # beads get to the bottom, we're all done.
             if advance_bead(bead, dt):
                 all_done = False
+            else:
+                print("bead", i, "done after %.2f" % t, "s")
             bead.graph.plot(t, bead.pos.y + WHEEL_RADIUS)
         if all_done:
             break
@@ -67,7 +69,7 @@ def draw_wire():
         vpython.cylinder(
             pos=tail,
             axis=(head - tail),
-            radius=0.02,
+            radius=0.02*WHEEL_RADIUS,
             texture=vpython.textures.metal,
         )
         theta += dtheta
@@ -90,7 +92,7 @@ def init_beads(nbeads):
         theta_start = 180*DEG*(i + 0.5)/nbeads
         bead = vpython.sphere(
             pos=vpython.vector(wire_x(theta_start), wire_y(theta_start), 0),
-            radius=0.1,
+            radius=0.1*WHEEL_RADIUS,
             color=COLORS[i],
         )
         # Use the bead object to keep track of all the dead's data, not just
