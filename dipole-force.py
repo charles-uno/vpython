@@ -15,8 +15,14 @@ Q0 = 2
 V0 = 1
 
 T = 0
-DT = 0.01
-TMAX = 20
+DT = 0.001
+TMAX = 10
+
+
+# For looking at the difference between the euler method and the midpoint
+# method. Midpoint method is stable at DT=0.01, while euler method is unstable
+# even at a tenth of that.
+USE_MIDPOINT = False
 
 
 def main():
@@ -28,7 +34,7 @@ def main():
     )
     ion = vpython.sphere(
         color=vpython.color.magenta,
-        radius=0.01*R0,
+        radius=0.05*R0,
         pos=vpython.vector(0, R0, 0),
     )
     trail = vpython.curve(
@@ -49,6 +55,9 @@ def main():
             if ion.pos.mag > 100*R0:
                 print("UH OH")
                 break
+            if ion.v.mag > 2.5*V0:
+                print("UH OH")
+                break
         force = get_force(ion)
         ion.v += force*DT/ion.m
         ion.pos += ion.v*DT
@@ -65,6 +74,9 @@ def get_force(ion):
         v_int = 1.5*ion.v - 0.5*ion.v_prev
     # Fake it the first time, since there is no v_prev.
     except AttributeError:
+        v_int = ion.v
+    # Alternatively, skip the interpolation.
+    if not USE_MIDPOINT:
         v_int = ion.v
     ion.v_prev = ion.v
     b = get_b(ion.pos)

@@ -10,7 +10,6 @@ DEG = math.pi/180
 
 WHEEL_RADIUS = 1
 GRAVITY = 9.81
-BEAD_MASS = 1
 
 COLORS = (
     vpython.color.red,
@@ -22,32 +21,38 @@ COLORS = (
 )
 
 
-# Keep track of time globally so we don't have to pass it around everywhere
-t = 0
-dt = 0.001
-tmax = 2
-
-
 def main():
     draw_wire()
     init_graph()
     beads = init_beads(6)
-    # Keep looping until the advance_beads function returns False
-
-    sample_counter = 0
-
-    while advance_beads(beads):
-
-        dt_sample = 0.05
-        sample_rate = dt_sample/dt
-
-        if sample_counter % sample_rate == 0:
-            stamp = "%03.0f" % (1000*t)
-            print(f"saving: brac-{stamp}.png")
-            vpython.scene.capture(f"brac-{stamp}.png")
-        sample_counter += 1
-
+    t, dt, tmax = 0, 0.01, 2
+    while t < tmax:
+        t += dt
+        vpython.rate(1/dt)
+        all_done = True
+        for bead in beads:
+            # Once this bead gets to the bottom, stop updating it. Once all the
+            # beads get to the bottom, we're all done.
+            if advance_bead(bead, dt):
+                all_done = False
+            bead.graph.plot(t, bead.pos.y + WHEEL_RADIUS)
+        if all_done:
+            break
     return
+
+
+def advance_bead(bead, dt):
+    # Short-circuit this bead's motion as soon as it gets to the bottom
+    if bead.pos.x > 0:
+        return False
+    # Figure out the unconstrained velocity first, then project it onto the
+    # direction of the wire. Don't bother computing the force of constraint.
+    dvdt = vpython.vector(0, -GRAVITY, 0)
+    v = bead.v + dvdt*dt
+    w_hat = wire_direction(wire_theta(bead.pos))
+    bead.v = w_hat*v.dot(w_hat)
+    bead.pos += bead.v*dt
+    return True
 
 
 def draw_wire():
@@ -69,9 +74,6 @@ def draw_wire():
     return
 
 
-GRAPHS = []
-
-
 def init_graph():
     vpython.graph(
         title="Beads on a Cycloid Wire",
@@ -79,10 +81,6 @@ def init_graph():
         ytitle="Height (m)",
         fast=False,
     )
-    for i, color in enumerate(COLORS):
-        GRAPHS.append(
-            vpython.gcurve(color=COLORS[i], width=2)
-        )
     return
 
 
@@ -95,37 +93,12 @@ def init_beads(nbeads):
             radius=0.1,
             color=COLORS[i],
         )
-        # Track velocity along with position
+        # Use the bead object to keep track of all the dead's data, not just
+        # the visual stuff.
         bead.v = vpython.vector(0, 0, 0)
+        bead.graph = vpython.gcurve(color=COLORS[i], width=2)
         beads.append(bead)
     return beads
-
-
-def advance_beads(beads):
-    global t
-    t += dt
-    vpython.rate(1/dt)
-    all_done = True
-    for i, bead in enumerate(beads):
-        f_g = vpython.vector(0, -BEAD_MASS*GRAVITY, 0)
-        # Compute the unconstrained velocity first, then take the component
-        # along the direction of the wire. Normal force will be whatever makes
-        # that happen.
-        v = bead.v + f_g*dt/BEAD_MASS
-        w_hat = wire_direction(wire_theta(bead.pos))
-        bead.v = w_hat*(v.x*w_hat.x + v.y*w_hat.y)
-
-        if bead.v.y == 0:
-            continue
-
-
-        bead.pos += bead.v*dt
-
-        if t < tmax:
-            all_done = False
-
-        GRAPHS[i].plot(t, bead.pos.y + WHEEL_RADIUS)
-    return not all_done
 
 
 # Some helper functions for keeping track of the shape of the wire. Note
@@ -141,32 +114,12 @@ def wire_y(theta):
 
 
 def wire_theta(pos):
+    # Note: since we're getting theta from y, this will only work for descent
     try:
-        theta = math.acos(pos.y/WHEEL_RADIUS)
-        return theta if pos.x < 0 else 2*math.pi - theta
-    # Possible that we'll dip slightly below the wire numerically
+        return math.acos(pos.y/WHEEL_RADIUS)
+    # Numerical jitters may dip us a bit below zero
     except ValueError:
         return math.pi
-
-    # Alternatively, try to figure this out numerically. This lets us climb
-    # back up after bottoming out, though it's a pretty big hammer.
-    t0, t1 = 0, 2*math.pi
-    for _ in range(30):
-        if wire_error(t0, pos) < wire_error(t1, pos):
-            t1 = (t0 + t1)/2
-        else:
-            t0 = (t0 + t1)/2
-    return (t0 + t1)/2
-
-
-def wire_error(theta, pos):
-    x, y = wire_x(theta), wire_y(theta)
-    return math.sqrt((pos.x - x)**2 + (pos.y - y)**2)
-
-
-
-
-
 
 
 def wire_direction(theta):
