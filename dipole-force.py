@@ -36,13 +36,12 @@ def main():
         color=vpython.color.magenta,
         radius=0.05*R0,
         pos=vpython.vector(0, R0, 0),
-    )
-    trail = vpython.curve(
-        pos=ion.pos,
-        color=vpython.color.white,
+        make_trail=True,
+        interval=10,
     )
     # Tack some physical (but non-displaying) parameters onto the ion object
     ion.v = vpython.vector(V0, 0, 0)
+    ion.v_prev = ion.v
     ion.q = Q0
     ion.m = M0
     while T < TMAX:
@@ -61,7 +60,6 @@ def main():
         force = get_force(ion)
         ion.v += force*DT/ion.m
         ion.pos += ion.v*DT
-        trail.append(ion.pos)
     return
 
 
@@ -70,13 +68,10 @@ def get_force(ion):
     # That is, we have r(0), and so we also have B(0). But to jump from r(-1)
     # to r(0), we used v(-0.5). In order to get F(0), we interpolate v(0) from
     # v(-0.5) and v(-1.5).
-    try:
+    if USE_MIDPOINT:
         v_int = 1.5*ion.v - 0.5*ion.v_prev
-    # Fake it the first time, since there is no v_prev.
-    except AttributeError:
-        v_int = ion.v
     # Alternatively, skip the interpolation.
-    if not USE_MIDPOINT:
+    else:
         v_int = ion.v
     ion.v_prev = ion.v
     b = get_b(ion.pos)
