@@ -7,6 +7,7 @@ import vpython
 # Some global variables for convenience
 
 DEG = math.pi/180
+RAD = 1/DEG
 
 WHEEL_RADIUS = 100
 GRAVITY = 9.81
@@ -25,7 +26,7 @@ def main():
     draw_wire()
     init_graph()
     beads = init_beads(6)
-    t, dt, tmax = 0, 0.1, 20
+    t, dt, tmax = 0, 0.1, 6
     while t < tmax:
         t += dt
         vpython.rate(1/dt)
@@ -37,7 +38,7 @@ def main():
                 all_done = False
             else:
                 print("bead", i, "done after %.2f" % t, "s")
-            bead.graph.plot(t, bead.pos.y + WHEEL_RADIUS)
+            bead.graph.plot(t, 180 - wire_theta(bead.pos.y)*RAD)
         if all_done:
             break
     return
@@ -80,7 +81,7 @@ def init_graph():
     vpython.graph(
         title="Beads on a Cycloid Wire",
         xtitle="Time (s)",
-        ytitle="Height (m)",
+        ytitle="180<sup>o</sup> - Cycloid Angle (<sup>o</sup>)",
         fast=False,
     )
     return

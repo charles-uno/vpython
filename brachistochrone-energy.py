@@ -1,135 +1,126 @@
 #!/usr/bin/env python3
 
-import math
-import random
-import vpython
+from math import *
+from vpython import *
 
-# Some global variables for convenience
-
-DEG = math.pi/180
+# Degrees are more legible, but trig functions use radians.
+DEG = pi/180
+RAD = 1/DEG
 
 WHEEL_RADIUS = 100
 GRAVITY = 9.81
-
-COLORS = (
-    vpython.color.red,
-    vpython.color.orange,
-    vpython.color.yellow,
-    vpython.color.green,
-    vpython.color.blue,
-    vpython.color.magenta,
-)
+BEAD_MASS = 1
 
 
 def main():
-    draw_wire()
+    init_wire()
     init_graph()
-    beads = init_beads(6)
+    # Create a handful of color-coded beads, each starting at a different angle
+    beads = [
+        init_bead(color=color.red, angle=15*DEG),
+        init_bead(color=color.orange, angle=45*DEG),
+        init_bead(color=color.yellow, angle=75*DEG),
+        init_bead(color=color.green, angle=105*DEG),
+        init_bead(color=color.blue, angle=135*DEG),
+        init_bead(color=color.magenta, angle=165*DEG),
+    ]
+    # We'll loop until we get to the bottom, but set tmax as a precaution.
+    # Don't want to spin our wheels forever if something goes wrong.
     t, dt, tmax = 0, 0.1, 20
     while t < tmax:
         t += dt
-        vpython.rate(1/dt)
-        all_done = True
-        for i, bead in enumerate(beads):
-            # Once this bead gets to the bottom, stop updating it. Once all the
-            # beads get to the bottom, we're all done.
-            if advance_bead(bead, dt):
-                all_done = False
-            else:
-                print("bead", i, "done after %.2f" % t, "s")
-            bead.graph.plot(t, bead.pos.y + WHEEL_RADIUS)
-        if all_done:
-            break
+        rate(1/dt)
+        for bead in beads:
+            # Use energy conservation to figure out kinetic energy. That whole
+            # kinetic energy is velocity along the direction of the wire.
+            energy_kinetic = bead.energy_initial - bead.mass*GRAVITY*bead.pos.y
+            direction = wire_direction(wire_theta(bead.pos.y))
+            velocity = sqrt(2*energy_kinetic/bead.mass)*direction
+            bead.pos += velocity*dt
+            # Let's plot angle along the cycloid curve rather than the vertical
+            # component of the position. The angle goes from 0 to 180 degrees,
+            # which is pretty easy to eyeball, whereas the vertical position is
+            # scaled to the arbitrary wheel radius.
+            bead.graph.plot(t, 180 - wire_theta(bead.pos.y)*RAD)
+            # Stop updating as soon as any bead gets to the bottom. In theory,
+            # they should all get there at pretty much the same time.
+            if bead.pos.x > 0:
+                break
     return
 
 
-def advance_bead(bead, dt):
-    # Short-circuit this bead's motion as soon as it gets to the bottom
-    if bead.pos.x > 0:
-        return False
-    bead.v = wire_v(bead.pos.y, bead.y0)
-    bead.pos += bead.v*dt
-    return True
-
-
-def draw_wire():
+def init_wire():
+    # Trace the cycloid curve, drawing a bunch of tiny cylinders as we go, to
+    # draw the wire.
     theta_min, theta_max = 0, 360*DEG
     dtheta = (theta_max - theta_min)/500
     theta = theta_min
     while theta < theta_max:
         x0, y0 = wire_x(theta), wire_y(theta)
         x1, y1 = wire_x(theta + dtheta), wire_y(theta + dtheta)
-        head = vpython.vector(x0, y0, 0)
-        tail = vpython.vector(x1, y1, 0)
-        vpython.cylinder(
+        head = vector(x0, y0, 0)
+        tail = vector(x1, y1, 0)
+        cylinder(
             pos=tail,
             axis=(head - tail),
             radius=0.02*WHEEL_RADIUS,
-            texture=vpython.textures.metal,
+            texture=textures.metal,
         )
         theta += dtheta
     return
 
 
 def init_graph():
-    vpython.graph(
+    graph(
         title="Beads on a Cycloid Wire",
         xtitle="Time (s)",
-        ytitle="Height (m)",
+        ytitle="180<sup>o</sup> - Cycloid Angle (<sup>o</sup>)",
         fast=False,
     )
     return
 
 
-def init_beads(nbeads):
-    beads = []
-    for i in range(nbeads):
-        theta_start = 180*DEG*(i + 0.5)/nbeads
-        bead = vpython.sphere(
-            pos=vpython.vector(wire_x(theta_start), wire_y(theta_start), 0),
-            radius=0.1*WHEEL_RADIUS,
-            color=COLORS[i],
-        )
-        # Use the bead object to keep track of all the dead's data, not just
-        # the visual stuff.
-        bead.graph = vpython.gcurve(color=COLORS[i], width=2)
-        # Track the initial position for energy purposes. Also need to give
-        # each bead a tiny kick to get going, since we don't track velocity.
-        bead.y0 = bead.pos.y + 1e-5
-        beads.append(bead)
-    return beads
+def init_bead(color, angle):
+    bead = sphere(
+        pos=vector(wire_x(angle), wire_y(angle), 0),
+        radius=0.1*WHEEL_RADIUS,
+        color=color,
+        mass=BEAD_MASS,
+    )
+    # Use the bead object to keep track of all the dead's data, not just the
+    # visual stuff.
+    bead.graph = gcurve(color=color, width=2)
+    # Keep track of the initial energy so we can later map from position to
+    # velocity. Also need to give each bead a tiny kick to get going. Otherwise
+    # the initial velocity will be zero and nothing will ever move.
+    bead.energy_initial = bead.mass*GRAVITY*bead.pos.y + 1e-5
+    return bead
 
 
 # Some helper functions for keeping track of the shape of the wire. Note
 # there's an offset above y=0 because the camera is centered at the origin
-
-
-def wire_v(y, y0=0):
-    return math.sqrt(-2*GRAVITY*(y - y0))*wire_direction(wire_theta(y))
-
-
 def wire_x(theta):
-    return WHEEL_RADIUS*(theta - math.sin(theta)) - math.pi*WHEEL_RADIUS
+    return WHEEL_RADIUS*(theta - sin(theta)) - pi*WHEEL_RADIUS
 
 
 def wire_y(theta):
-    return WHEEL_RADIUS*math.cos(theta)
+    return WHEEL_RADIUS*cos(theta)
 
 
 def wire_theta(y):
-    # Note: since we're getting theta from y, this will only work for descent
+    # Note: due to the domain of acos, this will only work on the descent
     try:
-        return math.acos(y/WHEEL_RADIUS)
+        return acos(y/WHEEL_RADIUS)
     # Numerical jitters may dip us a bit below zero
     except ValueError:
-        return math.pi
+        return pi
 
 
 def wire_direction(theta):
     small = 1e-5
     dy = wire_y(theta + small) - wire_y(theta - small)
     dx = wire_x(theta + small) - wire_x(theta - small)
-    return vpython.vector(dx, dy, 0)/math.sqrt(dx*dx + dy*dy)
+    return vector(dx, dy, 0)/sqrt(dx*dx + dy*dy)
 
 
 if __name__ == "__main__":
