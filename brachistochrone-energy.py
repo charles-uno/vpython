@@ -17,12 +17,12 @@ def main():
     init_graph()
     # Create a handful of color-coded beads, each starting at a different angle
     beads = [
-        init_bead(color=color.red, angle=15*DEG),
-        init_bead(color=color.orange, angle=45*DEG),
-        init_bead(color=color.yellow, angle=75*DEG),
-        init_bead(color=color.green, angle=105*DEG),
-        init_bead(color=color.blue, angle=135*DEG),
-        init_bead(color=color.magenta, angle=165*DEG),
+        add_bead(color=color.red, angle=15*DEG),
+        add_bead(color=color.orange, angle=45*DEG),
+        add_bead(color=color.yellow, angle=75*DEG),
+        add_bead(color=color.green, angle=105*DEG),
+        add_bead(color=color.blue, angle=135*DEG),
+        add_bead(color=color.magenta, angle=165*DEG),
     ]
     # We'll loop until we get to the bottom, but set tmax as a precaution.
     # Don't want to spin our wheels forever if something goes wrong.
@@ -31,6 +31,10 @@ def main():
         t += dt
         rate(1/dt)
         for bead in beads:
+            # Stop updating as soon as any bead gets to the bottom. In theory,
+            # they should all get there at pretty much the same time.
+            if bead.pos.x > 0:
+                break
             # Use energy conservation to figure out kinetic energy. That whole
             # kinetic energy is velocity along the direction of the wire.
             energy_kinetic = bead.energy_initial - bead.mass*GRAVITY*bead.pos.y
@@ -42,10 +46,6 @@ def main():
             # which is pretty easy to eyeball, whereas the vertical position is
             # scaled to the arbitrary wheel radius.
             bead.graph.plot(t, 180 - wire_theta(bead.pos.y)*RAD)
-            # Stop updating as soon as any bead gets to the bottom. In theory,
-            # they should all get there at pretty much the same time.
-            if bead.pos.x > 0:
-                break
     return
 
 
@@ -80,7 +80,7 @@ def init_graph():
     return
 
 
-def init_bead(color, angle):
+def add_bead(color, angle):
     bead = sphere(
         pos=vector(wire_x(angle), wire_y(angle), 0),
         radius=0.1*WHEEL_RADIUS,
@@ -108,19 +108,18 @@ def wire_y(theta):
 
 
 def wire_theta(y):
-    # Note: due to the domain of acos, this will only work on the descent
-    try:
+    # Note: due to the domain of acos, this will only work on the descent. Note
+    # also that numerical jitters may dip us below the wire.
+    if -WHEEL_RADIUS <= y <= WHEEL_RADIUS:
         return acos(y/WHEEL_RADIUS)
-    # Numerical jitters may dip us a bit below zero
-    except ValueError:
+    else:
         return pi
 
 
 def wire_direction(theta):
-    small = 1e-5
-    dy = wire_y(theta + small) - wire_y(theta - small)
-    dx = wire_x(theta + small) - wire_x(theta - small)
-    return vector(dx, dy, 0)/sqrt(dx*dx + dy*dy)
+    dxdtheta = WHEEL_RADIUS*(1 - cos(theta))
+    dydtheta = -WHEEL_RADIUS*sin(theta)
+    return vector(dxdtheta, dydtheta, 0).hat
 
 
 if __name__ == "__main__":
