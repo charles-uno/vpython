@@ -25,8 +25,8 @@ SPRING_CONSTANT = 10000
 SPRING_LENGTH_RELAX = CHAIN_LENGTH/N_SPRINGS
 
 # For no damping, set this to zero. In that case, the springs will oscillate
-# forever rather than relaxing. Setting it to 0.01 means we artificially
-# decrease the velocity of each link by 1% every time step to help it relax
+# forever rather than relaxing. Setting it to 0.1 means we artificially
+# decrease the velocity of each link by 10% every time step to help it relax
 # into its lowest energy state.
 FRICTION = 0.05
 
@@ -113,6 +113,7 @@ def relax_chain(links):
             # the form of this friction may not be physical!
             links[i].velocity = links[i].velocity*(1 - FRICTION)
             next_pos[i] = links[i].pos + links[i].velocity*dt
+#            links[i].pos += links[i].velocity*dt
         # Go back through and apply all the new positions at once.
         for pos, link in zip(next_pos, links):
             link.pos = pos
@@ -173,8 +174,9 @@ def catenary_length(alpha):
 
 
 def parabola_length(a):
+    # Return the curve length of a parabola 0.5at^2 between our posts.
     t = a*POST_WIDTH/2
-    return 2*(0.5*t*sqrt(1 + t**2) + 0.5*log(t + sqrt(1 + t**2)))/a
+    return (t*sqrt(1 + t**2) + log(t + sqrt(1 + t**2)))/a
 
 
 def bisection_search(target, func, guess):
@@ -191,7 +193,6 @@ def bisection_search(target, func, guess):
             guess_min = guess_med
         else:
             guess_max = guess_med
-        print("guess:", target_med)
     return guess_med
 
 
