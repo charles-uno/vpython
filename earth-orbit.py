@@ -8,6 +8,8 @@ from vpython import *
 KILOGRAM = 1/(5.97e24)
 METER = 1/(1.496e11)
 SECOND = 1/(3.154e7)
+# Degrees are more legible but the computer uses radians.
+DEGREES = pi/180
 
 EARTH_MASS = 5.97e24*KILOGRAM
 SUN_MASS = 1.99e30*KILOGRAM
@@ -21,49 +23,53 @@ G = 6.674e-11*METER**3/KILOGRAM/SECOND**2
 F_GRAV = G*EARTH_MASS*SUN_MASS/EARTH_ORBIT_RADIUS**2
 EARTH_MOMENTUM = sqrt(EARTH_ORBIT_RADIUS*EARTH_MASS*F_GRAV)
 # The effective potential depends on the reduced mass as well as the orbital
-# angular momentum. The easiest way to look at multiple planets is to just mess
-# with the radial component of the initial velocity. Leave perpendicular
-# velocity and mass consistent.
+# angular momentum. We'll keep this constant across all planets we look at.
 EARTH_ORBITAL_ANGULAR_MOMENTUM = EARTH_ORBIT_RADIUS*EARTH_MOMENTUM
 
-# Our units are legible... but what do they mean? Figure out what our units of
-# energy are.
+# Our units are legible... but what do they mean?
 JOULE = KILOGRAM*METER**2/SECOND**2
-print("Energy of 1 corresponds to:", 1/JOULE, "J")
+print("We are measuring energy in units of:", 1/JOULE, "J")
 
-# Non-physical parameter -- how fast do we want the animation to play?
-YEARS_PER_SECOND = 0.25
+# Plotting trails and graphs is a lot of work for the computer. Scale that back
+# to make execution smoother.
+PLOT_INTERVAL = 20
 
 
 def main():
     init_graph()
     draw_potential()
-    planets = get_planets(
-        color.green,
-        color.blue,
-        color.magenta,
-        color.red,
-        color.orange,
-    )
+    planets = [
+        get_planet(color=color.red, launch_angle=0),
+        get_planet(color=color.orange, launch_angle=10*DEGREES),
+        get_planet(color=color.yellow, launch_angle=20*DEGREES),
+        get_planet(color=color.green, launch_angle=30*DEGREES),
+        get_planet(color=color.cyan, launch_angle=40*DEGREES),
+    ]
     sun = get_sun()
     # We want to watch years of motion in just a few seconds.
-    t = 0
     dt = 0.001*YEAR
-    tmax = 10*YEAR
-    while t < tmax:
-        rate(YEARS_PER_SECOND/dt)
-        t += dt
+    step = 0
+    max_steps = 10*YEAR/dt
+    while step < max_steps:
+        # When measuring time in seconds, rate(1/dt) plays back in real time.
+        # But we're measuring time in years, so it'll play one year of movement
+        # per second.
+        rate(1/dt)
+        step += 1
         for planet in planets:
             r = planet.pos - sun.pos
             force = -r.hat * G*planet.mass*sun.mass/r.mag**2
-            # Fix the position of the sun. This is slightly inaccurate, but
-            # saves us a lot of headaches due to looking at multiple planets at
-            # the same time.
+            # We want each two-body problem to be independent, but they all
+            # share the same sun. To avoid any coupling between the planets,
+            # fix the position of the sun. This is only a tiny bit inaccurate
+            # since the sun is several orders of magnitude more massive than
+            # the earth.
             planet.momentum += force*dt
             planet.pos += planet.momentum*dt/planet.mass
             energy = system_energy(sun, planet)
-            r = (planet.pos - sun.pos).mag
-            planet.curve.plot(r, energy)
+            # To improve performance, don't update the graph every time
+            if step % PLOT_INTERVAL == 0:
+                planet.curve.plot(r.mag, energy)
     return
 
 
@@ -85,13 +91,16 @@ def ucent(r):
 
 def init_graph():
     umin = ugrav(EARTH_ORBIT_RADIUS) + ucent(EARTH_ORBIT_RADIUS)
+    print("Potential well depth is:", umin)
     return graph(
-        title="Energy of Planetary Orbits",
+        title="Energy Trajectories of Planetary Orbits",
         xtitle="r (Earth orbit radii)",
-        ytitle="U (10<sup>32</sup>J)",
+        ytitle="U (x10<sup>32</sup>J)",
         fast=False,
+        # Figure out the depth of the potential well, then make the graph go a
+        # little bit lower.
         ymin=1.2*umin,
-        ymax=-1.2*umin,
+        ymax=-0.6*umin,
     )
     return
 
@@ -108,29 +117,35 @@ def draw_potential():
     return
 
 
-def get_planets(*colors):
-    planets = []
-    for i, c in enumerate(colors):
-        radial_momentum = i*EARTH_MOMENTUM/len(colors)
-        planet = sphere(
-            radius=0.05*EARTH_ORBIT_RADIUS,
-            color=c,
-            pos=vector(0, EARTH_ORBIT_RADIUS, 0),
-            mass=EARTH_MASS,
-            momentum=vector(EARTH_MOMENTUM, radial_momentum, 0),
-            make_trail=True,
-            interval=10,
-        )
-        # Each planet can carry arounds its own graph object.
-        planet.curve = gcurve(color=c, width=2)
-        planets.append(planet)
-    return planets
+def get_planet(color, launch_angle):
+    # The launch angle is relative to the circular orbit.
+    radial_momentum = EARTH_MOMENTUM*tan(launch_angle)
+    planet = sphere(
+        radius=0.05*EARTH_ORBIT_RADIUS,
+        color=color,
+        pos=vector(0, EARTH_ORBIT_RADIUS, 0),
+        mass=EARTH_MASS,
+        momentum=vector(EARTH_MOMENTUM, radial_momentum, 0),
+        make_trail=True,
+        interval=PLOT_INTERVAL,
+    )
+    kinetic_energy = 0.5*planet.momentum.y**2/planet.mass
+    print("Creating planet with radial kinetic energy of:", kinetic_energy)
+    # We need a curve for each planet object. Might as well attach the
+    # curves to the planets rather than storing them somewhere else.
+    planet.curve = gcurve(color=color, width=2)
+    return planet
 
 
 def get_sun():
+    # For a proper simulation, the sun would move. But that makes our logistics
+    # tricky, since we want to just look at two-body systems, and there are
+    # multiple planets orbiting the same sun. For simplicity, and since the
+    # motion of the sun is a comparatively small source of energy, let's just
+    # fix it.
     return sphere(
-        radius=0.1*EARTH_ORBIT_RADIUS,
-        color=color.yellow,
+        radius=0.2*EARTH_ORBIT_RADIUS,
+        color=color.white,
         pos=vector(0, 0, 0),
         mass=SUN_MASS,
         momentum=vector(0, 0, 0),
