@@ -9,11 +9,11 @@ C = 1
 # Slinky length
 L = 10
 # Number of sine waves to use in our solution
-N_TERMS = 20
+N_TERMS = (3, 10, 20)
 
 # the math we worked through is continuous, but if we want to plot it we need
 # to get discrete. Points are spaced uniformly from 0 to L
-N_POINTS = 200
+N_POINTS = 100
 
 # Wave length and height are used to figure out the initial displacement as
 # well as the initial velocity.
@@ -28,12 +28,11 @@ def main():
     alpha, beta = get_fourier_weights()
     # Rather than repeatedly clearing and re-plotting lines, let's just move a
     # bunch of spheres around.
-    dots = []
-    for x, u in zip(xarr(), initial_displacement()):
-        # Offset by L/2. In our math we worked from 0 to L, but the plot will
-        # look nicer if we draw from -L/2 to L/2
-        dot = sphere(radius=L/N_POINTS, pos=vector(x - L/2, u, 0))
-        dots.append(dot)
+    curves = [
+        get_curve("1D Wave with 3 Fourier Terms"),
+        get_curve("1D Wave with 10 Fourier Terms"),
+        get_curve("1D Wave with 20 Fourier Terms"),
+    ]
     # We're solving for this motion using the wave equation, not forces. Time
     # step is just to make the animation look nice.
     t, dt, tmax = 0, 0.1, 20
@@ -42,7 +41,7 @@ def main():
         t += dt
         # Build up u(x, t) as a sum of eigenvectors
         u = [0]*N_POINTS
-        for n in range(N_TERMS):
+        for n in range(max(N_TERMS)):
             # The online interpreter doesn't let us import Numpy for proper
             # arrays, and it also doesn't let us define our own classes, so
             # array multiplication is a bit clunky.
@@ -53,17 +52,49 @@ def main():
                         alpha[n]*time_cos(n, t) + beta[n]*time_sin(n, t)
                     )
                 )
-        # Update the position of our dots.
-        for dot, ui in zip(dots, u):
-            dot.pos.y = ui
+            # Update plots once we get to the appropriate number of Fourier
+            # terms. We want to see the difference between them.
+
+            if n+1 == 3:
+                curves[0].delete()
+                for xi, ui in zip(xarr(), u):
+                    curves[0].plot(xi, ui)
+
+            if n+1 == 10:
+                curves[1].delete()
+                for xi, ui in zip(xarr(), u):
+                    curves[1].plot(xi, ui)
+
+
+            if n+1 == 20:
+                curves[2].delete()
+                for xi, ui in zip(xarr(), u):
+                    curves[2].plot(xi, ui)
+
     return
+
+
+
+
+def get_curve(title):
+    graph(
+        title=title,
+        xtitle="X",
+        ytitle="Displacement",
+        fast=False,
+        xmin=0,
+        xmax=L,
+        ymin=-1.2*WAVE_HEIGHT,
+        ymax=1.2*WAVE_HEIGHT,
+    )
+    return gcurve(color=color.blue, width=2)
 
 
 def get_fourier_weights():
     u0 = initial_displacement()
     v0 = initial_velocity()
     alpha, beta = [], []
-    for n in range(N_TERMS):
+    for n in range(max(N_TERMS)):
         # Alpha amplitudes correspond to the cosine wave in t, which is at
         # maximum amplitude and zero velocity at t=0
         an = inner_product(u0, eigenvector(n))
@@ -76,8 +107,6 @@ def get_fourier_weights():
     return alpha, beta
 
 
-# Initial displacement. sine squared is nice because it goes to u=0 and u'=0 at
-# the edges. Makes the wave look smoother.
 def initial_displacement():
     """Sine squared makes for a nice initial displacement because u=0 and u'=0
     at the edge of the pulse.
@@ -111,10 +140,10 @@ def xarr():
 
 
 def eigenvector(n):
-    arr = []
-    for xi in xarr():
-        arr.append(sin((n+1)*pi*xi/L))
-    return arr
+    # Glowscript interpreter does not like this xarr() call in the list
+    # comprehension for some reason.
+    xvals = xarr()
+    return [sin((n+1)*pi*xi/L) for xi in xvals]
 
 
 def time_sin(n, t):
@@ -130,6 +159,8 @@ def inner_product(arr1, arr2):
     # normality.
     dx = L/N_POINTS
     tally = 0
+    # Glowscript does not get along with the zip() or sum() builtin functions
+    # in combination with list comprehensions.
     for a1, a2 in zip(arr1, arr2):
         tally += a1*a2*dx
     return tally*2/L
